@@ -15,9 +15,13 @@ func NewShortenerService(s store.Store) *ShortenerService {
 	return &ShortenerService{store: s}
 }
 
+func nextID() (int64, error) {
+	return time.Now().UnixNano(), nil
+}
+
 func (s *ShortenerService) Shorten(originalURL string) (*store.Link, error) {
-	// 1. Get Next ID from Store
-	id, err := s.store.NextID()
+	// 1. Generate Next ID
+	id, err := nextID()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate ID: %w", err)
 	}
