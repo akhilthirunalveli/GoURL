@@ -66,6 +66,16 @@ func LoadConfig() *Config {
 	cfg.DB.Name = viper.GetString("DB_NAME")
 	cfg.DB.SSLMode = viper.GetString("DB_SSLMODE")
 
+	// Validate required DB configuration values
+	if cfg.DB.User == "" {
+		log.Fatalf("required configuration DB_USER is missing or empty")
+	}
+	if cfg.DB.Password == "" {
+		log.Fatalf("required configuration DB_PASSWORD is missing or empty")
+	}
+	if cfg.DB.Name == "" {
+		log.Fatalf("required configuration DB_NAME is missing or empty")
+	}
 	cfg.Redis.Addr = viper.GetString("REDIS_ADDR")
 	cfg.Redis.Password = viper.GetString("REDIS_PASSWORD")
 
