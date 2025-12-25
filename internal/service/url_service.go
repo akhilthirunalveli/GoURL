@@ -4,10 +4,12 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"log"
 	"math/big"
 	"net/url"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/akhilthirunalveli/GoURL/internal/cache"
 	"github.com/akhilthirunalveli/GoURL/internal/database"
@@ -93,7 +95,7 @@ func (s *URLService) CreateShortURL(ctx context.Context, originalURL, customCode
 	// Cache the URL
 	if err := s.cache.Set(ctx, shortCode, urlEntry); err != nil {
 		// Log error but don't fail the request
-		fmt.Printf("Warning: failed to cache URL: %v\n", err)
+		log.Printf("Warning: failed to cache URL: %v", err)
 	}
 
 	return &models.CreateURLResponse{
@@ -117,14 +119,16 @@ func (s *URLService) GetOriginalURL(ctx context.Context, shortCode string, clien
 	cachedURL, err := s.cache.Get(ctx, shortCode)
 	if err != nil {
 		// Log error but continue to database
-		fmt.Printf("Warning: cache get failed: %v\n", err)
+		log.Printf("Warning: cache get failed: %v", err)
 	}
 
 	if cachedURL != nil {
 		// Increment click count asynchronously
 		go func() {
-			if err := s.db.IncrementClickCount(context.Background(), shortCode); err != nil {
-				fmt.Printf("Warning: failed to increment click count: %v\n", err)
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := s.db.IncrementClickCount(ctx, shortCode); err != nil {
+				log.Printf("Warning: failed to increment click count: %v", err)
 			}
 		}()
 		return cachedURL.OriginalURL, nil
@@ -143,13 +147,15 @@ func (s *URLService) GetOriginalURL(ctx context.Context, shortCode string, clien
 	// Cache the result
 	if err := s.cache.Set(ctx, shortCode, urlEntry); err != nil {
 		// Log error but don't fail the request
-		fmt.Printf("Warning: failed to cache URL: %v\n", err)
+		log.Printf("Warning: failed to cache URL: %v", err)
 	}
 
 	// Increment click count asynchronously
 	go func() {
-		if err := s.db.IncrementClickCount(context.Background(), shortCode); err != nil {
-			fmt.Printf("Warning: failed to increment click count: %v\n", err)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := s.db.IncrementClickCount(ctx, shortCode); err != nil {
+			log.Printf("Warning: failed to increment click count: %v", err)
 		}
 	}()
 
