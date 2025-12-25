@@ -30,14 +30,13 @@ func (s *ShortenerService) Shorten(originalURL string) (*store.Link, error) {
 	code := Encode(id)
 
 	link := &store.Link{
-		ID:          id,
 		OriginalURL: originalURL,
 		ShortCode:   code,
 		CreatedAt:   time.Now(),
 		ExpiresAt:   time.Now().Add(24 * 7 * time.Hour), // Default 1 week
 	}
 
-	// 3. Save Link with explicit ID
+	// 3. Save Link
 	if err := s.store.SaveLink(link); err != nil {
 		return nil, fmt.Errorf("failed to save link: %w", err)
 	}
