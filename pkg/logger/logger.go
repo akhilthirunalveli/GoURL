@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-var Log *slog.Logger
+var Log = slog.Default()
 
 func InitLogger(env string) {
 	var handler slog.Handler
