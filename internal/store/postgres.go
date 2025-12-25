@@ -41,11 +41,11 @@ func (s *PostgresStore) Close() {
 	s.pool.Close()
 }
 
-func (s *PostgresStore) SaveLink(link *Link) error {
+func (s *PostgresStore) SaveLink(ctx context.Context, link *Link) error {
 	query := `INSERT INTO links (original_url, short_code, created_at, expires_at) 
 			  VALUES ($1, $2, $3, $4) RETURNING id`
 
-	err := s.pool.QueryRow(context.Background(), query,
+	err := s.pool.QueryRow(ctx, query,
 		link.OriginalURL, link.ShortCode, link.CreatedAt, link.ExpiresAt).Scan(&link.ID)
 
 	if err != nil {
@@ -54,11 +54,11 @@ func (s *PostgresStore) SaveLink(link *Link) error {
 	return nil
 }
 
-func (s *PostgresStore) GetLinkByCode(code string) (*Link, error) {
+func (s *PostgresStore) GetLinkByCode(ctx context.Context, code string) (*Link, error) {
 	query := `SELECT id, original_url, short_code, created_at, expires_at FROM links WHERE short_code = $1`
 
 	var link Link
-	err := s.pool.QueryRow(context.Background(), query, code).Scan(
+	err := s.pool.QueryRow(ctx, query, code).Scan(
 		&link.ID, &link.OriginalURL, &link.ShortCode, &link.CreatedAt, &link.ExpiresAt,
 	)
 
