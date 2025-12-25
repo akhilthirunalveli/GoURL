@@ -1,9 +1,13 @@
 package main
 
 import (
-	"fmt"
+	"net/http"
+	"os"
 
 	"github.com/akhilthirunalveli/GoURL/internal/config"
+	"github.com/akhilthirunalveli/GoURL/internal/service"
+	"github.com/akhilthirunalveli/GoURL/internal/store"
+	"github.com/akhilthirunalveli/GoURL/internal/transport/rest"
 	"github.com/akhilthirunalveli/GoURL/pkg/logger"
 )
 
@@ -19,8 +23,26 @@ func main() {
 		"port", cfg.Server.Port,
 	)
 
-	// Placeholder for server start
-	fmt.Printf("Server is configured to run on port %s\n", cfg.Server.Port)
-	fmt.Printf("Database Host: %s\n", cfg.DB.Host)
-	fmt.Printf("Redis Addr: %s\n", cfg.Redis.Addr)
+	// Initialize Store
+	dbStore, err := store.NewPostgresStore(cfg.DB)
+	if err != nil {
+		logger.Log.Error("Failed to initialize database store", "error", err)
+		os.Exit(1)
+	}
+	defer dbStore.Close()
+
+	// Initialize Service
+	svc := service.NewShortenerService(dbStore)
+
+	// Initialize HTTP Handler & Router
+	handler := rest.NewHandler(svc)
+	router := rest.SetupRoutes(handler)
+
+	// Start Server
+	serverAddr := ":" + cfg.Server.Port
+	logger.Log.Info("Server listening...", "address", serverAddr)
+	if err := http.ListenAndServe(serverAddr, router); err != nil {
+		logger.Log.Error("Server failed to start", "error", err)
+		os.Exit(1)
+	}
 }

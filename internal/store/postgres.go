@@ -32,6 +32,15 @@ func NewPostgresStore(cfg config.DBConfig) (*PostgresStore, error) {
 	return &PostgresStore{pool: pool}, nil
 }
 
+func (s *PostgresStore) NextID(ctx context.Context) (uint64, error) {
+	var id uint64
+	err := s.pool.QueryRow(ctx, "SELECT nextval('links_id_seq')").Scan(&id)
+	if err != nil {
+		return 0, fmt.Errorf("failed to generate next id: %w", err)
+	}
+	return id, nil
+}
+
 // Pool exposes the underlying connection pool (For testing purposes)
 func (s *PostgresStore) Pool() *pgxpool.Pool {
 	return s.pool
