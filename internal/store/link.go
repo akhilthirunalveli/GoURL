@@ -1,6 +1,9 @@
 package store
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 type Link struct {
 	ID          uint64     `json:"id"`
@@ -12,7 +15,7 @@ type Link struct {
 
 // Store defines the interface for link storage
 type Store interface {
-	SaveLink(link *Link) error
-	GetLinkByCode(code string) (*Link, error)
+	SaveLink(ctx context.Context, link *Link) error
+	GetLinkByCode(ctx context.Context, code string) (*Link, error)
 	Close()
 }
