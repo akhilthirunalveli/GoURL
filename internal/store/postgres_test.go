@@ -12,39 +12,40 @@ import (
 )
 
 // TestPostgresIntegration runs a real database test.
-// It skips if DB_HOST is not set or if connection fails (optional, but good for CI/CD separation)
+// It skips if INTEGRATION_TEST is not set to "true" or if the database connection fails.
 func TestPostgresIntegration(t *testing.T) {
+	// Skip if INTEGRATION_TEST environment variable is not set to "true"
+	if os.Getenv("INTEGRATION_TEST") != "true" {
+		t.Skip("Skipping integration test: INTEGRATION_TEST environment variable not set to 'true'")
+	}
+
 	// Initialize logger for tests
 	logger.InitLogger("development")
 
-	// Load config purely from env or use defaults.
-	// To run this locally, ensure you have set env vars or rely on the defaults which point to localhost
+	// Load config from env or use safe defaults for local development.
+	// For any real/manual runs, ensure DB_PASSWORD (and other DB_* vars as needed) are set in the environment.
 	cfg := config.DBConfig{
 		Host:     "localhost",
 		Port:     "5432",
 		User:     "postgres",
-		Password: "password", // Change logic to read from env if needed for local manual run
+		Password: os.Getenv("DB_PASSWORD"),
 		Name:     "gourl",
 		SSLMode:  "disable",
 	}
 
-	// Allow overriding via env vars
+	// Allow overriding host via env vars
 	if h := os.Getenv("DB_HOST"); h != "" {
 		cfg.Host = h
-	}
-	if p := os.Getenv("DB_PASSWORD"); p != "" {
-		cfg.Password = p
 	}
 
 	s, err := store.NewPostgresStore(cfg)
 	if err != nil {
-		t.Logf("Skipping integration test: %v", err)
-		return
+		t.Skipf("Skipping integration test: database connection failed: %v", err)
 	}
 	defer s.Close()
 
 	// Initial Migration (Quick & Dirty for Test)
-	_, _ = s.Pool().Exec(context.Background(), `
+	_, err = s.Pool().Exec(context.Background(), `
 		CREATE TABLE IF NOT EXISTS links (
 			id BIGSERIAL PRIMARY KEY,
 			original_url TEXT NOT NULL,
@@ -53,16 +54,21 @@ func TestPostgresIntegration(t *testing.T) {
 			expires_at TIMESTAMP WITH TIME ZONE
 		);
 	`)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
 
+	// Test Save with ExpiresAt
 	// Test Save
+	expiresAt := time.Now().Add(24 * time.Hour)
 	link := &store.Link{
 		OriginalURL: "https://google.com",
 		ShortCode:   "test1",
 		CreatedAt:   time.Now(),
-		ExpiresAt:   time.Now().Add(24 * time.Hour),
+		ExpiresAt:   &expiresAt,
 	}
 
-	if err := s.SaveLink(link); err != nil {
+	if err := s.SaveLink(context.Background(), link); err != nil {
 		t.Fatalf("Failed to save link: %v", err)
 	}
 
@@ -71,13 +77,67 @@ func TestPostgresIntegration(t *testing.T) {
 	}
 
 	// Test Get
-	retrieved, err := s.GetLinkByCode("test1")
+	retrieved, err := s.GetLinkByCode(context.Background(), "test1")
 	if err != nil {
 		t.Fatalf("Failed to get link: %v", err)
 	}
 
+	// Verify OriginalURL
 	if retrieved.OriginalURL != link.OriginalURL {
 		t.Errorf("Expected URL %s, got %s", link.OriginalURL, retrieved.OriginalURL)
+	}
+
+	// Test Save with NULL ExpiresAt
+	linkNoExpiry := &store.Link{
+		OriginalURL: "https://example.com",
+		ShortCode:   "test2",
+		CreatedAt:   time.Now(),
+		ExpiresAt:   nil, // NULL expiry
+	}
+
+	if err := s.SaveLink(linkNoExpiry); err != nil {
+		t.Fatalf("Failed to save link with NULL ExpiresAt: %v", err)
+	}
+
+	if linkNoExpiry.ID == 0 {
+		t.Fatal("Expected ID to be set after save")
+	}
+
+	// Test Get for link with NULL ExpiresAt
+	retrievedNoExpiry, err := s.GetLinkByCode("test2")
+	if err != nil {
+		t.Fatalf("Failed to get link with NULL ExpiresAt: %v", err)
+	}
+
+	if retrievedNoExpiry.OriginalURL != linkNoExpiry.OriginalURL {
+		t.Errorf("Expected URL %s, got %s", linkNoExpiry.OriginalURL, retrievedNoExpiry.OriginalURL)
+	}
+
+	if retrievedNoExpiry.ExpiresAt != nil {
+		t.Errorf("Expected ExpiresAt to be nil, got %v", retrievedNoExpiry.ExpiresAt)
+	}
+
+	// Clean up test data even if the test fails, and do not ignore errors.
+	t.Cleanup(func() {
+		if _, err := s.Pool().Exec(context.Background(), "DELETE FROM links WHERE short_code IN ('test1', 'test2')"); err != nil {
+			t.Fatalf("failed to clean up test data: %v", err)
+		}
+	})
+	// Verify ShortCode
+	if retrieved.ShortCode != link.ShortCode {
+		t.Errorf("Expected ShortCode %s, got %s", link.ShortCode, retrieved.ShortCode)
+	}
+
+	// Verify CreatedAt (with tolerance for precision differences)
+	if retrieved.CreatedAt.Unix() != link.CreatedAt.Unix() {
+		t.Errorf("Expected CreatedAt %v, got %v", link.CreatedAt, retrieved.CreatedAt)
+	}
+
+	// Verify ExpiresAt
+	if retrieved.ExpiresAt == nil {
+		t.Error("Expected ExpiresAt to be non-nil")
+	} else if retrieved.ExpiresAt.Unix() != link.ExpiresAt.Unix() {
+		t.Errorf("Expected ExpiresAt %v, got %v", link.ExpiresAt, *retrieved.ExpiresAt)
 	}
 
 	// Clean up
