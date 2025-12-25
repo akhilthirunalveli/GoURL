@@ -44,7 +44,7 @@ func TestPostgresIntegration(t *testing.T) {
 	defer s.Close()
 
 	// Initial Migration (Quick & Dirty for Test)
-	_, _ = s.Pool().Exec(context.Background(), `
+	_, err = s.Pool().Exec(context.Background(), `
 		CREATE TABLE IF NOT EXISTS links (
 			id BIGSERIAL PRIMARY KEY,
 			original_url TEXT NOT NULL,
@@ -53,6 +53,9 @@ func TestPostgresIntegration(t *testing.T) {
 			expires_at TIMESTAMP WITH TIME ZONE
 		);
 	`)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
 
 	// Test Save
 	link := &store.Link{
