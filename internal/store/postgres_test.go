@@ -17,23 +17,20 @@ func TestPostgresIntegration(t *testing.T) {
 	// Initialize logger for tests
 	logger.InitLogger("development")
 
-	// Load config purely from env or use defaults.
-	// To run this locally, ensure you have set env vars or rely on the defaults which point to localhost
+	// Load config from env or use safe defaults for local development.
+	// For any real/manual runs, ensure DB_PASSWORD (and other DB_* vars as needed) are set in the environment.
 	cfg := config.DBConfig{
 		Host:     "localhost",
 		Port:     "5432",
 		User:     "postgres",
-		Password: "password", // Change logic to read from env if needed for local manual run
+		Password: os.Getenv("DB_PASSWORD"),
 		Name:     "gourl",
 		SSLMode:  "disable",
 	}
 
-	// Allow overriding via env vars
+	// Allow overriding host via env vars
 	if h := os.Getenv("DB_HOST"); h != "" {
 		cfg.Host = h
-	}
-	if p := os.Getenv("DB_PASSWORD"); p != "" {
-		cfg.Password = p
 	}
 
 	s, err := store.NewPostgresStore(cfg)
