@@ -64,7 +64,7 @@ func TestPostgresIntegration(t *testing.T) {
 		ExpiresAt:   &expiresAt,
 	}
 
-	if err := s.SaveLink(link); err != nil {
+	if err := s.SaveLink(context.Background(), link); err != nil {
 		t.Fatalf("Failed to save link: %v", err)
 	}
 
@@ -73,7 +73,7 @@ func TestPostgresIntegration(t *testing.T) {
 	}
 
 	// Test Get
-	retrieved, err := s.GetLinkByCode("test1")
+	retrieved, err := s.GetLinkByCode(context.Background(), "test1")
 	if err != nil {
 		t.Fatalf("Failed to get link: %v", err)
 	}
