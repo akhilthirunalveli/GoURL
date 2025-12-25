@@ -113,12 +113,7 @@ func TestPostgresIntegration(t *testing.T) {
 
 	// Clean up test data even if the test fails, and do not ignore errors.
 	t.Cleanup(func() {
-		if _, err := s.Pool().Exec(context.Background(), "DELETE FROM links WHERE short_code = 'test1'"); err != nil {
-			t.Fatalf("failed to clean up test data: %v", err)
-		}
-	})
-	t.Cleanup(func() {
-		if _, err := s.Pool().Exec(context.Background(), "DELETE FROM links WHERE short_code = 'test2'"); err != nil {
+		if _, err := s.Pool().Exec(context.Background(), "DELETE FROM links WHERE short_code IN ('test1', 'test2')"); err != nil {
 			t.Fatalf("failed to clean up test data: %v", err)
 		}
 	})
