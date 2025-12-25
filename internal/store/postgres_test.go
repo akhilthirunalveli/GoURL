@@ -58,6 +58,7 @@ func TestPostgresIntegration(t *testing.T) {
 		t.Fatalf("Failed to create table: %v", err)
 	}
 
+	// Test Save with ExpiresAt
 	// Test Save
 	expiresAt := time.Now().Add(24 * time.Hour)
 	link := &store.Link{
@@ -86,6 +87,42 @@ func TestPostgresIntegration(t *testing.T) {
 		t.Errorf("Expected URL %s, got %s", link.OriginalURL, retrieved.OriginalURL)
 	}
 
+	// Test Save with NULL ExpiresAt
+	linkNoExpiry := &store.Link{
+		OriginalURL: "https://example.com",
+		ShortCode:   "test2",
+		CreatedAt:   time.Now(),
+		ExpiresAt:   nil, // NULL expiry
+	}
+
+	if err := s.SaveLink(linkNoExpiry); err != nil {
+		t.Fatalf("Failed to save link with NULL ExpiresAt: %v", err)
+	}
+
+	if linkNoExpiry.ID == 0 {
+		t.Fatal("Expected ID to be set after save")
+	}
+
+	// Test Get for link with NULL ExpiresAt
+	retrievedNoExpiry, err := s.GetLinkByCode("test2")
+	if err != nil {
+		t.Fatalf("Failed to get link with NULL ExpiresAt: %v", err)
+	}
+
+	if retrievedNoExpiry.OriginalURL != linkNoExpiry.OriginalURL {
+		t.Errorf("Expected URL %s, got %s", linkNoExpiry.OriginalURL, retrievedNoExpiry.OriginalURL)
+	}
+
+	if retrievedNoExpiry.ExpiresAt != nil {
+		t.Errorf("Expected ExpiresAt to be nil, got %v", retrievedNoExpiry.ExpiresAt)
+	}
+
+	// Clean up test data even if the test fails, and do not ignore errors.
+	t.Cleanup(func() {
+		if _, err := s.Pool().Exec(context.Background(), "DELETE FROM links WHERE short_code IN ('test1', 'test2')"); err != nil {
+			t.Fatalf("failed to clean up test data: %v", err)
+		}
+	})
 	// Verify ShortCode
 	if retrieved.ShortCode != link.ShortCode {
 		t.Errorf("Expected ShortCode %s, got %s", link.ShortCode, retrieved.ShortCode)
