@@ -52,6 +52,7 @@ func LoadConfig() *Config {
 	viper.SetDefault("ENV", "development")
 	viper.SetDefault("DB_HOST", "localhost")
 	viper.SetDefault("DB_PORT", "5432")
+	viper.SetDefault("DB_SSLMODE", "require")
 	viper.SetDefault("REDIS_ADDR", "localhost:6379")
 
 	var cfg Config
