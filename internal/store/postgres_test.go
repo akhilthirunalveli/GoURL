@@ -12,8 +12,13 @@ import (
 )
 
 // TestPostgresIntegration runs a real database test.
-// It skips if DB_HOST is not set or if connection fails (optional, but good for CI/CD separation)
+// It skips if INTEGRATION_TEST is not set to "true" or if the database connection fails.
 func TestPostgresIntegration(t *testing.T) {
+	// Skip if INTEGRATION_TEST environment variable is not set to "true"
+	if os.Getenv("INTEGRATION_TEST") != "true" {
+		t.Skip("Skipping integration test: INTEGRATION_TEST environment variable not set to 'true'")
+	}
+
 	// Initialize logger for tests
 	logger.InitLogger("development")
 
@@ -38,8 +43,7 @@ func TestPostgresIntegration(t *testing.T) {
 
 	s, err := store.NewPostgresStore(cfg)
 	if err != nil {
-		t.Logf("Skipping integration test: %v", err)
-		return
+		t.Skipf("Skipping integration test: database connection failed: %v", err)
 	}
 	defer s.Close()
 
@@ -55,11 +59,12 @@ func TestPostgresIntegration(t *testing.T) {
 	`)
 
 	// Test Save
+	expiresAt := time.Now().Add(24 * time.Hour)
 	link := &store.Link{
 		OriginalURL: "https://google.com",
 		ShortCode:   "test1",
 		CreatedAt:   time.Now(),
-		ExpiresAt:   time.Now().Add(24 * time.Hour),
+		ExpiresAt:   &expiresAt,
 	}
 
 	if err := s.SaveLink(link); err != nil {
