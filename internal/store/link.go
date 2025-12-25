@@ -14,5 +14,6 @@ type Link struct {
 type Store interface {
 	SaveLink(link *Link) error
 	GetLinkByCode(code string) (*Link, error)
+	NextID() (uint64, error)
 	Close()
 }

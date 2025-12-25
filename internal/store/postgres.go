@@ -32,6 +32,15 @@ func NewPostgresStore(cfg config.DBConfig) (*PostgresStore, error) {
 	return &PostgresStore{pool: pool}, nil
 }
 
+func (s *PostgresStore) NextID() (uint64, error) {
+	var id uint64
+	err := s.pool.QueryRow(context.Background(), "SELECT nextval('links_id_seq')").Scan(&id)
+	if err != nil {
+		return 0, fmt.Errorf("failed to generate next id: %w", err)
+	}
+	return id, nil
+}
+
 // Pool exposes the underlying connection pool (For testing purposes)
 func (s *PostgresStore) Pool() *pgxpool.Pool {
 	return s.pool
@@ -42,6 +51,18 @@ func (s *PostgresStore) Close() {
 }
 
 func (s *PostgresStore) SaveLink(link *Link) error {
+	// If ID is provided, insert it explicitly. Otherwise, let DB generate it.
+	if link.ID != 0 {
+		query := `INSERT INTO links (id, original_url, short_code, created_at, expires_at) 
+				  VALUES ($1, $2, $3, $4, $5)`
+		_, err := s.pool.Exec(context.Background(), query,
+			link.ID, link.OriginalURL, link.ShortCode, link.CreatedAt, link.ExpiresAt)
+		if err != nil {
+			return fmt.Errorf("failed to save link with id: %w", err)
+		}
+		return nil
+	}
+
 	query := `INSERT INTO links (original_url, short_code, created_at, expires_at) 
 			  VALUES ($1, $2, $3, $4) RETURNING id`
 
