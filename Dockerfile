@@ -2,15 +2,14 @@ FROM golang:1.21-alpine AS builder
 
 WORKDIR /app
 
-# Install dependencies
+# Copy dependencies first
 COPY go.mod go.sum ./
-RUN go mod download
 
 # Copy source code
 COPY . .
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -o /app/bin/server ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux go build -mod=mod -o /app/bin/server ./cmd/server
 
 # Runtime stage
 FROM alpine:latest
