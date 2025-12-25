@@ -52,11 +52,12 @@ func TestPostgresIntegration(t *testing.T) {
 	`)
 
 	// Test Save
+	expiresAt := time.Now().Add(24 * time.Hour)
 	link := &store.Link{
 		OriginalURL: "https://google.com",
 		ShortCode:   "test1",
 		CreatedAt:   time.Now(),
-		ExpiresAt:   time.Now().Add(24 * time.Hour),
+		ExpiresAt:   &expiresAt,
 	}
 
 	if err := s.SaveLink(link); err != nil {
@@ -73,14 +74,28 @@ func TestPostgresIntegration(t *testing.T) {
 		t.Fatalf("Failed to get link: %v", err)
 	}
 
+	// Verify OriginalURL
 	if retrieved.OriginalURL != link.OriginalURL {
 		t.Errorf("Expected URL %s, got %s", link.OriginalURL, retrieved.OriginalURL)
 	}
 
-	// Clean up test data even if the test fails, and do not ignore errors.
-	t.Cleanup(func() {
-		if _, err := s.Pool().Exec(context.Background(), "DELETE FROM links WHERE short_code = 'test1'"); err != nil {
-			t.Fatalf("failed to clean up test data: %v", err)
-		}
-	})
+	// Verify ShortCode
+	if retrieved.ShortCode != link.ShortCode {
+		t.Errorf("Expected ShortCode %s, got %s", link.ShortCode, retrieved.ShortCode)
+	}
+
+	// Verify CreatedAt (with tolerance for precision differences)
+	if retrieved.CreatedAt.Unix() != link.CreatedAt.Unix() {
+		t.Errorf("Expected CreatedAt %v, got %v", link.CreatedAt, retrieved.CreatedAt)
+	}
+
+	// Verify ExpiresAt
+	if retrieved.ExpiresAt == nil {
+		t.Error("Expected ExpiresAt to be non-nil")
+	} else if retrieved.ExpiresAt.Unix() != link.ExpiresAt.Unix() {
+		t.Errorf("Expected ExpiresAt %v, got %v", link.ExpiresAt, *retrieved.ExpiresAt)
+	}
+
+	// Clean up
+	_, _ = s.Pool().Exec(context.Background(), "DELETE FROM links WHERE short_code = 'test1'")
 }
